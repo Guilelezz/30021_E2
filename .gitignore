@@ -1,0 +1,29 @@
+.DS_Store
+# STM32CubeIDE / Eclipse
+.settings/
+*.launch
+*.jlink
+
+# Build output
+Debug/
+Release/
+
+# Compiler/build artifacts
+*.elf
+*.map
+*.bin
+*.hex
+*.srec
+*.lst
+*.o
+*.d
+*.a
+*.su
+*.crl
+
+# IDE/log/temporary files
+*.log
+*.bak
+
+# Eclipse workspace metadata
+.metadata/

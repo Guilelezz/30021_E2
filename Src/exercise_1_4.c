@@ -1,4 +1,4 @@
-#include "stm32f30x_conf.h"
+/*#include "stm32f30x_conf.h"
 #include "30010_io.h"
 #include <stdio.h>
 #include <inttypes.h>
@@ -189,3 +189,4 @@ void exercise_1_4(void)
         }
     }
 }
+*/

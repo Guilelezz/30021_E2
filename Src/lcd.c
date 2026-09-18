@@ -1,250 +1,207 @@
-#include "stm32f30x_conf.h"
+#include "lcd.h"
+#include "charset.h"
 
-void LCD_GPIO_Init(void)
-{
-    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
-    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
-
-    GPIO_InitTypeDef GPIO_InitStructure;
-
-    // CS
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-    // RESET
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14;
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-    // A0
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-    GPIO_SetBits(GPIOB, GPIO_Pin_6);
-    GPIO_SetBits(GPIOB, GPIO_Pin_14);
-}
-
-void LCD_SPI_Init(void)
-{
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
-
-    GPIO_PinAFConfig(GPIOB, GPIO_PinSource13, GPIO_AF_5);
-    GPIO_PinAFConfig(GPIOB, GPIO_PinSource15, GPIO_AF_5);
-
-    GPIO_InitTypeDef GPIO_InitStructure;
-
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_15;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-    SPI_InitTypeDef SPI_InitStructure;
-
-    SPI_InitStructure.SPI_Direction = SPI_Direction_1Line_Tx;
-    SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
-    SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
-    SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
-    SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;
-    SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
-    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_16;
-    SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
-    SPI_InitStructure.SPI_CRCPolynomial = 7;
-
-    SPI_Init(SPI2, &SPI_InitStructure);
-    SPI_Cmd(SPI2, ENABLE);
-}
-
-void LCD_SPI_Write(uint8_t data)
-{
-    while (!(SPI2->SR & SPI_SR_TXE));
-
+/*****************************/
+/*** LCD Control Functions ***/
+/*****************************/
+void lcd_transmit_byte(uint8_t data) {
+    GPIOB->ODR &= ~(0x0001 << 6); // CS = 0 - Start Transmission
+    while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) { }
     SPI_SendData8(SPI2, data);
-
-    while (SPI2->SR & SPI_SR_BSY);
+    while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) { }
+    GPIOB->ODR |=  (0x0001 << 6); // CS = 1 - End Transmission
 }
 
-void LCD_Reset(void)
+void lcd_push_buffer(uint8_t* buffer)
 {
-    GPIO_ResetBits(GPIOB, GPIO_Pin_14);
+    int i = 0;
 
-    for (volatile int i=0; i<100000; i++);
+    //page 0
+    GPIOA->ODR &= ~(0x0001 << 8); // A0 = 0 - Set Command
+    lcd_transmit_byte(0x00);      // set column low nibble 0
+    lcd_transmit_byte(0x10);      // set column hi  nibble 0
+    lcd_transmit_byte(0xB0);      // set page address  0
 
-    GPIO_SetBits(GPIOB, GPIO_Pin_14);
-
-    for (volatile int i=0; i<100000; i++);
-}
-
-#define LCD_CS_LOW()      GPIO_ResetBits(GPIOB, GPIO_Pin_6)
-#define LCD_CS_HIGH()     GPIO_SetBits(GPIOB, GPIO_Pin_6)
-
-#define LCD_A0_CMD()      GPIO_ResetBits(GPIOA, GPIO_Pin_8)
-#define LCD_A0_DATA()     GPIO_SetBits(GPIOA, GPIO_Pin_8)
-
-void LCD_Command(uint8_t cmd)
-{
-    LCD_A0_CMD();
-
-    LCD_CS_LOW();
-    LCD_SPI_Write(cmd);
-    LCD_CS_HIGH();
-}
-
-void LCD_Data(uint8_t data)
-{
-    LCD_A0_DATA();
-
-    LCD_CS_LOW();
-    LCD_SPI_Write(data);
-}
-
-void LCD_Init(void)
-{
-    LCD_Reset();
-
-    LCD_Command(0xAE); // Display OFF
-
-    LCD_Command(0xA2); // LCD bias 1/9
-    LCD_Command(0xA0); // ADC normal
-    LCD_Command(0xC8); // COM reverse
-    LCD_Command(0x22); // Resistor ratio
-
-    LCD_Command(0x2F); // Power control
-
-    LCD_Command(0x40); // Display start line 0
-
-    LCD_Command(0xAF); // Display ON
-}
-
-// 5x7 font table, covers ASCII 0x20 (space) through 0x5F (underscore)
-// each glyph is 5 columns wide; bits 0-6 of each byte are the 7 pixel rows
-const uint8_t Font5x7[][5] = {
-    {0x00, 0x00, 0x00, 0x00, 0x00}, // (space)
-    {0x00, 0x00, 0x5F, 0x00, 0x00}, // !
-    {0x00, 0x07, 0x00, 0x07, 0x00}, // "
-    {0x14, 0x7F, 0x14, 0x7F, 0x14}, // #
-    {0x24, 0x2A, 0x7F, 0x2A, 0x12}, // $
-    {0x23, 0x13, 0x08, 0x64, 0x62}, // %
-    {0x36, 0x49, 0x56, 0x20, 0x50}, // &
-    {0x00, 0x08, 0x07, 0x03, 0x00}, // '
-    {0x00, 0x1C, 0x22, 0x41, 0x00}, // (
-    {0x00, 0x41, 0x22, 0x1C, 0x00}, // )
-    {0x2A, 0x1C, 0x7F, 0x1C, 0x2A}, // *
-    {0x08, 0x08, 0x3E, 0x08, 0x08}, // +
-    {0x00, 0x80, 0x70, 0x30, 0x00}, // ,
-    {0x08, 0x08, 0x08, 0x08, 0x08}, // -
-    {0x00, 0x00, 0x60, 0x60, 0x00}, // .
-    {0x20, 0x10, 0x08, 0x04, 0x02}, // /
-    {0x3E, 0x51, 0x49, 0x45, 0x3E}, // 0
-    {0x00, 0x42, 0x7F, 0x40, 0x00}, // 1
-    {0x72, 0x49, 0x49, 0x49, 0x46}, // 2
-    {0x21, 0x41, 0x49, 0x4D, 0x33}, // 3
-    {0x18, 0x14, 0x12, 0x7F, 0x10}, // 4
-    {0x27, 0x45, 0x45, 0x45, 0x39}, // 5
-    {0x3C, 0x4A, 0x49, 0x49, 0x31}, // 6
-    {0x41, 0x21, 0x11, 0x09, 0x07}, // 7
-    {0x36, 0x49, 0x49, 0x49, 0x36}, // 8
-    {0x46, 0x49, 0x49, 0x29, 0x1E}, // 9
-    {0x00, 0x00, 0x14, 0x00, 0x00}, // :
-    {0x00, 0x40, 0x34, 0x00, 0x00}, // ;
-    {0x00, 0x08, 0x14, 0x22, 0x41}, //
-    {0x14, 0x14, 0x14, 0x14, 0x14}, // =
-    {0x00, 0x41, 0x22, 0x14, 0x08}, // >
-    {0x02, 0x01, 0x59, 0x09, 0x06}, // ?
-    {0x3E, 0x41, 0x5D, 0x59, 0x4E}, // @
-    {0x7C, 0x12, 0x11, 0x12, 0x7C}, // A
-    {0x7F, 0x49, 0x49, 0x49, 0x36}, // B
-    {0x3E, 0x41, 0x41, 0x41, 0x22}, // C
-    {0x7F, 0x41, 0x41, 0x41, 0x3E}, // D
-    {0x7F, 0x49, 0x49, 0x49, 0x41}, // E
-    {0x7F, 0x09, 0x09, 0x09, 0x01}, // F
-    {0x3E, 0x41, 0x49, 0x49, 0x7A}, // G
-    {0x7F, 0x08, 0x08, 0x08, 0x7F}, // H
-    {0x00, 0x41, 0x7F, 0x41, 0x00}, // I
-    {0x20, 0x40, 0x41, 0x3F, 0x01}, // J
-    {0x7F, 0x08, 0x14, 0x22, 0x41}, // K
-    {0x7F, 0x40, 0x40, 0x40, 0x40}, // L
-    {0x7F, 0x02, 0x1C, 0x02, 0x7F}, // M
-    {0x7F, 0x04, 0x08, 0x10, 0x7F}, // N
-    {0x3E, 0x41, 0x41, 0x41, 0x3E}, // O
-    {0x7F, 0x09, 0x09, 0x09, 0x06}, // P
-    {0x3E, 0x41, 0x51, 0x21, 0x5E}, // Q
-    {0x7F, 0x09, 0x19, 0x29, 0x46}, // R
-    {0x46, 0x49, 0x49, 0x49, 0x31}, // S
-    {0x01, 0x01, 0x7F, 0x01, 0x01}, // T
-    {0x3F, 0x40, 0x40, 0x40, 0x3F}, // U
-    {0x1F, 0x20, 0x40, 0x20, 0x1F}, // V
-    {0x7F, 0x20, 0x18, 0x20, 0x7F}, // W
-    {0x63, 0x14, 0x08, 0x14, 0x63}, // X
-    {0x03, 0x04, 0x78, 0x04, 0x03}, // Y
-    {0x61, 0x51, 0x49, 0x45, 0x43}, // Z
-    {0x00, 0x00, 0x7F, 0x41, 0x41}, // [
-    {0x02, 0x04, 0x08, 0x10, 0x20}, // backslash
-    {0x41, 0x41, 0x7F, 0x00, 0x00}, // ]
-    {0x04, 0x02, 0x01, 0x02, 0x04}, // ^
-    {0x40, 0x40, 0x40, 0x40, 0x40}, // _
-};
-
-// page: 0-3 (each page is 8px tall), col: 0-127
-void LCD_SetCursor(uint8_t page, uint8_t col)
-{
-    LCD_Command(0xB0 + page);                 // page address
-    LCD_Command(0x10 | ((col >> 4) & 0x0F));  // upper column nibble
-    LCD_Command(0x00 | (col & 0x0F));         // lower column nibble
-}
-
-void LCD_WriteChar(char ch)
-{
-    if (ch >= 'a' && ch <= 'z') ch -= 0x20;   // no lowercase glyphs, use uppercase
-    if (ch < 0x20 || ch > 0x5F) ch = 0x20;    // unsupported char -> blank
-
-    const uint8_t *glyph = Font5x7[ch - 0x20];
-    for (uint8_t i = 0; i < 5; i++)
-    {
-        LCD_Data(glyph[i]);
+    GPIOA->ODR |=  (0x0001 << 8); // A0 = 1 - Set Data
+    for(i=0; i<128; i++) {
+       lcd_transmit_byte(buffer[i]);
     }
-    LCD_Data(0x00); // 1px gap between characters
+
+    // page 1
+    GPIOA->ODR &= ~(0x0001 << 8); // A0 = 0 - Set Command
+    lcd_transmit_byte(0x00);      // set column low nibble 0
+    lcd_transmit_byte(0x10);      // set column hi  nibble 0
+    lcd_transmit_byte(0xB1);      // set page address  1
+
+    GPIOA->ODR |=  (0x0001 << 8); // A0 = 1 - Set Data
+    for( i = 128 ; i < 256 ; i++ ) {
+       lcd_transmit_byte(buffer[i]);
+    }
+
+    //page 2
+    GPIOA->ODR &= ~(0x0001 << 8); // A0 = 0 - Set Command
+    lcd_transmit_byte(0x00);      // set column low nibble 0
+    lcd_transmit_byte(0x10);      // set column hi  nibble 0
+    lcd_transmit_byte(0xB2);      // set page address  2
+
+    GPIOA->ODR |=  (0x0001 << 8); // A0 = 1 - Set Data
+    for(i=256; i<384; i++) {
+       lcd_transmit_byte(buffer[i]);
+    }
+
+    //page 3
+    GPIOA->ODR &= ~(0x0001 << 8); // A0 = 0 - Set Command
+    lcd_transmit_byte(0x00);      // set column low nibble 0
+    lcd_transmit_byte(0x10);      // set column hi  nibble 0
+    lcd_transmit_byte(0xB3);      // set page address  3
+
+    GPIOA->ODR |=  (0x0001 << 8); // A0 = 1 - Set Data
+    for(i=384; i<512; i++) {
+       lcd_transmit_byte(buffer[i]);
+    }
 }
 
-// page: 0-3, col: 0-127 (start position)
-void LCD_WriteString(uint8_t page, uint8_t col, const char *str)
+void lcd_reset()
 {
-    LCD_SetCursor(page, col);
-    while (*str)
-    {
-        if (col > 128 - 6)              // no room left on this line
-        {
-            col = 0;
-            page = (page + 1) % 4;
-            LCD_SetCursor(page, col);
+    GPIOA->ODR &= ~(0x0001 << 8); // A0 = 0 - Reset Command/Data
+    GPIOB->ODR |=  (0x0001 << 6); // CS = 1 - Reset C/S
+
+    GPIOB->ODR &= ~(0x0001 << 14); // RESET = 0 - Reset Display
+    for (uint32_t i = 0 ; i < 4680 ; i++) { asm("nop"); }; // Wait
+    GPIOB->ODR |=  (0x0001 << 14); // RESET = 1 - Stop Reset
+    for (uint32_t i = 0 ; i < 390000 ; i++) { asm("nop"); }; // Wait
+
+    // Configure Display
+    GPIOA->ODR &= ~(0x0001 << 8); // A0 = 0 - Set Command
+
+    lcd_transmit_byte(0xAE);  // Turn off display
+    lcd_transmit_byte(0xA2);  // Set bias voltage to 1/9
+
+    lcd_transmit_byte(0xA0);  // Set display RAM address normal
+    lcd_transmit_byte(0xC8);  // Set update direction
+
+    lcd_transmit_byte(0x22);  // Set internal resistor ratio
+    lcd_transmit_byte(0x2F);  // Set operating mode
+    lcd_transmit_byte(0x40);  // Set start line address
+
+    lcd_transmit_byte(0xAF);  // Turn on display
+
+    lcd_transmit_byte(0x81);  // Set output voltage
+    lcd_transmit_byte(0x17);  // Set contrast
+
+    lcd_transmit_byte(0xA6);  // Set normal mode
+}
+
+void init_spi_lcd() {
+    // Enable Clocks
+    RCC->AHBENR  |= 0x00020000 | 0x00040000;    // Enable Clock for GPIO Banks A and B
+    RCC->APB1ENR |= 0x00004000;                 // Enable Clock for SPI2
+
+    // Connect pins to SPI2
+    GPIOB->AFR[13 >> 0x03] &= ~(0x0000000F << ((13 & 0x00000007) * 4)); // Clear alternate function for PB13
+    GPIOB->AFR[13 >> 0x03] |=  (0x00000005 << ((13 & 0x00000007) * 4)); // Set alternate 5 function for PB13 - SCLK
+    GPIOB->AFR[15 >> 0x03] &= ~(0x0000000F << ((15 & 0x00000007) * 4)); // Clear alternate function for PB15
+    GPIOB->AFR[15 >> 0x03] |=  (0x00000005 << ((15 & 0x00000007) * 4)); // Set alternate 5 function for PB15 - MOSI
+
+    // Configure pins PB13 and PB15 for 10 MHz alternate function
+    GPIOB->OSPEEDR &= ~(0x00000003 << (13 * 2) | 0x00000003 << (15 * 2));    // Clear speed register
+    GPIOB->OSPEEDR |=  (0x00000001 << (13 * 2) | 0x00000001 << (15 * 2));    // set speed register (0x01 - 10 MHz, 0x02 - 2 MHz, 0x03 - 50 MHz)
+    GPIOB->OTYPER  &= ~(0x0001     << (13)     | 0x0001     << (15));        // Clear output type register
+    GPIOB->OTYPER  |=  (0x0000     << (13)     | 0x0000     << (15));        // Set output type register (0x00 - Push pull, 0x01 - Open drain)
+    GPIOB->MODER   &= ~(0x00000003 << (13 * 2) | 0x00000003 << (15 * 2));    // Clear mode register
+    GPIOB->MODER   |=  (0x00000002 << (13 * 2) | 0x00000002 << (15 * 2));    // Set mode register (0x00 - Input, 0x01 - Output, 0x02 - Alternate Function, 0x03 - Analog in/out)
+    GPIOB->PUPDR   &= ~(0x00000003 << (13 * 2) | 0x00000003 << (15 * 2));    // Clear push/pull register
+    GPIOB->PUPDR   |=  (0x00000000 << (13 * 2) | 0x00000000 << (15 * 2));    // Set push/pull register (0x00 - No pull, 0x01 - Pull-up, 0x02 - Pull-down)
+
+    // Initialize REEST, nCS, and A0
+    // Configure pins PB6 and PB14 for 10 MHz output
+    GPIOB->OSPEEDR &= ~(0x00000003 << (6 * 2) | 0x00000003 << (14 * 2));    // Clear speed register
+    GPIOB->OSPEEDR |=  (0x00000001 << (6 * 2) | 0x00000001 << (14 * 2));    // set speed register (0x01 - 10 MHz, 0x02 - 2 MHz, 0x03 - 50 MHz)
+    GPIOB->OTYPER  &= ~(0x0001     << (6)     | 0x0001     << (14));        // Clear output type register
+    GPIOB->OTYPER  |=  (0x0000     << (6)     | 0x0000     << (14));        // Set output type register (0x00 - Push pull, 0x01 - Open drain)
+    GPIOB->MODER   &= ~(0x00000003 << (6 * 2) | 0x00000003 << (14 * 2));    // Clear mode register
+    GPIOB->MODER   |=  (0x00000001 << (6 * 2) | 0x00000001 << (14 * 2));    // Set mode register (0x00 - Input, 0x01 - Output, 0x02 - Alternate Function, 0x03 - Analog in/out)
+    GPIOB->PUPDR   &= ~(0x00000003 << (6 * 2) | 0x00000003 << (14 * 2));    // Clear push/pull register
+    GPIOB->PUPDR   |=  (0x00000000 << (6 * 2) | 0x00000000 << (14 * 2));    // Set push/pull register (0x00 - No pull, 0x01 - Pull-up, 0x02 - Pull-down)
+    // Configure pin PA8 for 10 MHz output
+    GPIOA->OSPEEDR &= ~0x00000003 << (8 * 2);    // Clear speed register
+    GPIOA->OSPEEDR |=  0x00000001 << (8 * 2);    // set speed register (0x01 - 10 MHz, 0x02 - 2 MHz, 0x03 - 50 MHz)
+    GPIOA->OTYPER  &= ~0x0001     << (8);        // Clear output type register
+    GPIOA->OTYPER  |=  0x0000     << (8);        // Set output type register (0x00 - Push pull, 0x01 - Open drain)
+
+
+    GPIOA->MODER   &= ~0x00000003 << (8 * 2);    // Clear mode register
+    GPIOA->MODER   |=  0x00000001 << (8 * 2);    // Set mode register (0x00 - Input, 0x01 - Output, 0x02 - Alternate Function, 0x03 - Analog in/out)
+
+    GPIOA->MODER   &= ~(0x00000003 << (2 * 2) | 0x00000003 << (3 * 2));    // This is needed for UART to work. It makes no sense.
+    GPIOA->MODER   |=  (0x00000002 << (2 * 2) | 0x00000002 << (3 * 2));
+
+    GPIOA->PUPDR   &= ~0x00000003 << (8 * 2);    // Clear push/pull register
+    GPIOA->PUPDR   |=  0x00000000 << (8 * 2);    // Set push/pull register (0x00 - No pull, 0x01 - Pull-up, 0x02 - Pull-down)
+
+    GPIOB->ODR |=  (0x0001 << 6); // CS = 1
+
+    // Configure SPI2
+    SPI2->CR1 &= 0x3040; // Clear CR1 Register
+    SPI2->CR1 |= 0x0000; // Configure direction (0x0000 - 2 Lines Full Duplex, 0x0400 - 2 Lines RX Only, 0x8000 - 1 Line RX, 0xC000 - 1 Line TX)
+    SPI2->CR1 |= 0x0104; // Configure mode (0x0000 - Slave, 0x0104 - Master)
+    SPI2->CR1 |= 0x0002; // Configure clock polarity (0x0000 - Low, 0x0002 - High)
+    SPI2->CR1 |= 0x0001; // Configure clock phase (0x0000 - 1 Edge, 0x0001 - 2 Edge)
+    SPI2->CR1 |= 0x0200; // Configure chip select (0x0000 - Hardware based, 0x0200 - Software based)
+    SPI2->CR1 |= 0x0008; // Set Baud Rate Prescaler (0x0000 - 2, 0x0008 - 4, 0x0018 - 8, 0x0020 - 16, 0x0028 - 32, 0x0028 - 64, 0x0030 - 128, 0x0038 - 128)
+    SPI2->CR1 |= 0x0000; // Set Bit Order (0x0000 - MSB First, 0x0080 - LSB First)
+    SPI2->CR2 &= ~0x0F00; // Clear CR2 Register
+    SPI2->CR2 |= 0x0700; // Set Number of Bits (0x0300 - 4, 0x0400 - 5, 0x0500 - 6, ...);
+    SPI2->I2SCFGR &= ~0x0800; // Disable I2S
+    SPI2->CRCPR = 7; // Set CRC polynomial order
+    SPI2->CR2 &= ~0x1000;
+    SPI2->CR2 |= 0x1000; // Configure RXFIFO return at (0x0000 - Half-full (16 bits), 0x1000 - Quarter-full (8 bits))
+    SPI2->CR1 |= 0x0040; // Enable SPI2
+
+    lcd_reset();
+}
+
+void generate_line_buff(uint8_t * str, uint8_t * linebuff, uint16_t bufflen){
+    uint8_t idx;
+    //convert each character to a 5+1 (CHAR_WIDTH) slices and add it to the line buffer
+    for(int i = 0; i<bufflen; i++){
+        if (str[i] == '\0'){
+            break;
         }
-        LCD_WriteChar(*str++);
-        col += 6;
+        idx = CHAR_WIDTH*i;
+        linebuff[idx] = character_data[str[i]-0x20][0];
+        linebuff[idx+1] = character_data[str[i]-0x20][1];
+        linebuff[idx+2] = character_data[str[i]-0x20][2];
+        linebuff[idx+3] = character_data[str[i]-0x20][3];
+        linebuff[idx+4] = character_data[str[i]-0x20][4];
+        linebuff[idx+5] = 0x00;
     }
 }
 
-void LCD_Fill(void)
-{
-	for(uint8_t page = 0; page < 4; page++)
-	    {
-	        LCD_SetCursor(page, 0);
-	        for(uint8_t col = 0; col < 128; col++)
-	        {
-	            LCD_Data(0xFF);
-	        }
-	    }
-}
-
-void LCD_Clear(void)
-{
-    for(uint8_t page = 0; page < 4; page++)
-    {
-        LCD_SetCursor(page, 0);
-        for(uint8_t col = 0; col < 128; col++)
-        {
-            LCD_Data(0x00);
+void write_line_buff(uint8_t * linebuff, uint8_t * lcdbuff, uint8_t xoffset, uint8_t yoffset, uint8_t scrollena){
+    //copy lineBuffer into lcdBuffer;
+    //  x offset refers to the horizontal pixel offset and
+    //  y offset refers to the line offset
+    //note:     String will be capped, if it is longer than LCD_LINE_SIZE slices (i.e. 1 line)
+    //note2:    String will be capped, if it exceeds size of lcdBuffer.
+    //note3:    If scrolling is enabled, the LCD line will wrap around when xoffset is large enough.
+    //          Otherwise, it will be capped.
+    if (scrollena > 0){
+        for(uint8_t idx = 0; idx<LCD_LINE_SIZE; idx++){
+            lcdbuff[idx+yoffset*LCD_LINE_SIZE] = linebuff[(idx + xoffset) & LCD_LINE_BUFF_SIZE-1];
         }
+    }else{
+        memcpy(lcdbuff + xoffset+yoffset*LCD_LINE_SIZE, linebuff, sizeof(uint8_t) * LCD_LINE_SIZE-xoffset);
     }
+
+}
+
+void lcd_write_string(uint8_t * str, uint8_t * lcdBuff, uint8_t xoffset, uint8_t yoffset){
+    uint8_t lineBuff[256];
+    memset(lineBuff,0x00,256);
+    //render a string and add to the line buffer (256 slices long)
+    generate_line_buff(str, lineBuff, 255);
+    //add line buffer to LCD buffer at a specific x,y position
+    //  (horizontal scrolling is always disabled!)
+    write_line_buff(lineBuff, lcdBuff, xoffset, yoffset, 0);
 }

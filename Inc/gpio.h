@@ -1,8 +1,12 @@
-#ifndef JOYSTICK_H
-#define JOYSTICK_H
+#ifndef GPIO_H_
+#define GPIO_H_
+
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdio.h>
 
 #include "stm32f30x.h"
-#include <stdint.h>
+#include "30010_io.h"
 
 /* Global Flag Variables */
 extern volatile uint8_t joystick_flag ;
@@ -20,4 +24,20 @@ void initJoystick(void);
 void initEXTI(void);
 uint8_t readJoystick(void);
 
-#endif /* JOYSTICK_H */
+typedef enum
+{
+    LED_OFF,
+    LED_RED,
+    LED_GREEN,
+    LED_BLUE,
+    LED_YELLOW,
+    LED_CYAN,
+    LED_MAGENTA,
+    LED_WHITE
+} LedColor;
+
+void initLed(void);
+void setLed(LedColor color);
+
+
+#endif /* GPIO_H_ */

@@ -25,7 +25,9 @@ void ADC_setup_PA(){
 	ADC_InitStruct.ADC_ExternalTrigEventEdge = ADC_ExternalTrigEventEdge_None;
 	ADC_InitStruct.ADC_DataAlign = ADC_DataAlign_Right;
 	ADC_InitStruct.ADC_OverrunMode = DISABLE;
+	ADC_InitStruct.ADC_AutoInjMode = DISABLE;
 	ADC_InitStruct.ADC_NbrOfRegChannel = 1;
+
 	//sequencer length
 
 	ADC_Init(ADC1, &ADC_InitStruct);
@@ -52,6 +54,25 @@ void ADC_setup_PA(){
 
 }
 
+uint16_t ADC_reference(){
+	ADC_Cmd(ADC1,DISABLE);
+	ADC_VrefintCmd(ADC1,ENABLE); // setup ref voltage to channel 18
+	for(uint32_t i = 0; i<10000;i++); // I think this is needed...
+	ADC_Cmd(ADC1,ENABLE);
+	// turn on ADC
+
+	ADC_RegularChannelConfig(ADC1, ADC_Channel_18, 1, ADC_SampleTime_601Cycles5);
+	for(uint32_t i = 0; i<10000;i++); // I think this is needed...
+	ADC_StartConversion(ADC1); // Start ADC read
+
+	while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == 0); // Wait for ADC read
+	uint16_t sampled_value = ADC_GetConversionValue(ADC1);
+	uint16_t vref_calc = 0;
+	vref_calc = (uint16_t) (3300 * ((float)VREFINT_CAL/(float)sampled_value));
+	ADC_VrefintCmd(ADC1,DISABLE); // setup ref voltage to channel 18
+	return vref_calc;
+}
+
 uint16_t ADC_measure_PA(uint8_t ch){
 	if(ch == 1){
 		ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_1Cycles5);
@@ -66,6 +87,7 @@ uint16_t ADC_measure_PA(uint8_t ch){
 
 	return ADC_GetConversionValue(ADC1);
 }
+
 
 
 

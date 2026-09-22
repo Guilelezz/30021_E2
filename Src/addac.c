@@ -25,7 +25,9 @@ void ADC_setup_PA(){
 	ADC_InitStruct.ADC_ExternalTrigEventEdge = ADC_ExternalTrigEventEdge_None;
 	ADC_InitStruct.ADC_DataAlign = ADC_DataAlign_Right;
 	ADC_InitStruct.ADC_OverrunMode = DISABLE;
+	ADC_InitStruct.ADC_AutoInjMode = DISABLE;
 	ADC_InitStruct.ADC_NbrOfRegChannel = 1;
+
 	//sequencer length
 
 	ADC_Init(ADC1, &ADC_InitStruct);

@@ -18,11 +18,11 @@ void exercise_2_4(void)
 	uint8_t fbuffer[512];
     char buffer[32];
 
-    sprintf(buffer, "ADC1: %u",
+    sprintf(buffer, "ADC1: 0000",
 			adc1);
 	lcd_write_string(buffer, fbuffer, 0, 0);
 
-    sprintf(buffer, "ADC1: %u",
+    sprintf(buffer, "ADC2: 0000",
 			adc2);
 	lcd_write_string(buffer, fbuffer, 0, 1);
 	lcd_push_buffer(fbuffer);
@@ -35,9 +35,8 @@ void exercise_2_4(void)
     			adc1);
     	lcd_write_string(buffer, fbuffer, 0, 0);
 
+
     	adc2 = ADC_measure_PA(2);
-
-
         sprintf(buffer, "ADC2: %u",
     			adc2);
     	lcd_write_string(buffer, fbuffer, 0, 1);

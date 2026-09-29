@@ -13,8 +13,8 @@ void exercise_2_5(void)
 	init_spi_lcd();
 	ADC_setup_PA();
 
-	uint16_t V_REF_CALC = ADC_reference();
-	printf("V_ref: %u mV\n", V_REF_CALC);
+	uint16_t V_CALC = ADC_reference();
+	printf("V_ref: %u mV\n", V_CALC);
 
 	uint16_t adc1, adc2;
 	float adc1vol, adc2vol;
@@ -39,21 +39,21 @@ void exercise_2_5(void)
 
     while (1)
     {
-    	VREFINT_CAL;
+    	//VREFINT_CAL;
     	adc1 = ADC_measure_PA(1);
-    	adc1vol = 3.3/(4085)*adc1;
+    	adc1vol = ((float)V_CALC/1000)/(4085)*adc1;
         sprintf(buffer, "ADC1: %4g V",
     			adc1vol);
     	lcd_write_string(buffer, fbuffer, 0, 0);
 
     	adc2 = ADC_measure_PA(2);
-    	adc2vol = 3.3/(4085)*adc2;
+    	adc2vol = ((float)V_CALC/1000)/(4085)*adc2;
         sprintf(buffer, "ADC2: %4g V",
     			adc2vol);
     	lcd_write_string(buffer, fbuffer, 0, 1);
     	lcd_push_buffer(fbuffer);
 
-        sprintf(buffer, "V_REF_CALC: %4u mV", V_REF_CALC);
+        sprintf(buffer, "V_CALC: %4u mV", V_CALC);
     	lcd_write_string(buffer, fbuffer, 0, 3);
     	lcd_push_buffer(fbuffer);
     }

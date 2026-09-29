@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "stm32f30x.h"
 
 #ifndef LSM9DS1_H_
 #define LSM9DS1_H_
@@ -30,10 +31,7 @@
 #define INT1_TSH_ZL 0x37
 #define INT1_DURATION 0x38
 
-void lsm9ds1_init_spi1(void);
-void lsm9ds1_init_spi2(void);
+void init_spi_lsm9ds1(void);
 uint8_t lsm9ds1_read(uint8_t reg);
-void test_spi(void);
-void test_receive(void);
 
 #endif /* LSM9DS1_H_ */

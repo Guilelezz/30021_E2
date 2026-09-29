@@ -5,7 +5,7 @@ void exercise_4_1(void) {
 
 	uint8_t data_out;
 	while (1) {
-		data_out = ls9mds1_read(WHO_AM_I);
+		data_out = lsm9ds1_read(WHO_AM_I);
 		printf("Received data = %X02\n", data_out);
 	}
 }

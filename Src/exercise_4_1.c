@@ -1,4 +1,4 @@
-#include "lsm9ds1.c"
+#include "lsm9ds1.h"
 
 void exercise_4_1(void) {
 	init_spi_lsm9ds1();

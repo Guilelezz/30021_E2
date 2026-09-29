@@ -1,6 +1,6 @@
 # Group 4 - Digital Instrumentation
 ## Assignment 4
-** connections (using SPI2)**
+**connections (using SPI2)**
 | LSM9DS1             | STM32F302 | STM32F302 pin |
 | :------------------ | :-------: | ------------: |
 | GND                 | GND       | One of them   |

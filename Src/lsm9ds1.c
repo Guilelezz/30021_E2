@@ -80,7 +80,7 @@ void init_spi_lsm9ds1(void) {
 
 uint8_t lsm9ds1_read8(uint8_t addr)
 {
-    uint8_t data_out;
+    uint8_t data_out8;
 
     // Enable chip select via PB6 (Set low)
     GPIOB->ODR &= ~(1 << 6);       // CS low
@@ -96,16 +96,16 @@ uint8_t lsm9ds1_read8(uint8_t addr)
     SPI_SendData8(SPI2, 0x00);
     // Wait for second byte containing DataOut to arrive
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
-    data_out = SPI_ReceiveData8(SPI2);
+    data_out8 = SPI_ReceiveData8(SPI2);
     // Disable chip select by putting it high.
     GPIOB->ODR |= (1 << 6);        // CS high
 
-    return data_out;
+    return data_out8;
 }
 
 uint16_t lsm9ds1_read16(uint8_t addr)
 {
-    uint16_t data_out;
+    uint16_t data_out16;
     uint8_t data_lsb;
     uint8_t data_msb;
 
@@ -129,7 +129,7 @@ uint16_t lsm9ds1_read16(uint8_t addr)
 
     GPIOB->ODR |= (1 << 6);        // CS high
 
-    data_out = data_msb << 8 + data_lsb
+    data_out16 = (data_msb << 8) + data_lsb;
 
-    return data_out;
+    return data_out16;
 }

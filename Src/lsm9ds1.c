@@ -87,17 +87,11 @@ uint8_t lsm9ds1_read8(uint8_t addr)
     // Send register address + read bit
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
     SPI_SendData8(SPI2, addr | 0x80);
-    // Wait for first byte to arrive
-    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
-    SPI_ReceiveData8(SPI2); // Don't care about first received byte
 
     // Send empty byte to enable clock
-    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
     SPI_SendData8(SPI2, 0x00);
-    // Wait for second byte containing DataOut to arrive
-    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
     data_out8 = SPI_ReceiveData8(SPI2);
-    // Disable chip select by putting it high.
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
     GPIOB->ODR |= (1 << 6);        // CS high
 
     return data_out8;
@@ -107,29 +101,41 @@ uint16_t lsm9ds1_read16(uint8_t addr)
 {
     uint16_t data_out16;
     uint8_t data_lsb;
-    uint8_t data_msb;
+    uint8_t data_msb = 0x00;
 
     // Transmit
-    GPIOB->ODR &= ~(1 << 6);
-
+    GPIOB->ODR &= ~(0x0001 << 6);       // CS low
+    // Send register address + read bit
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
     SPI_SendData8(SPI2, addr | 0x80);
-    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
-    SPI_ReceiveData8(SPI2);
-    // Receive LSB
-    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+//    SPI_ReceiveData8(SPI2); // Don't care about first received byte
+
+    // Send empty byte to enable clock
     SPI_SendData8(SPI2, 0x00);
-    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
     data_lsb = SPI_ReceiveData8(SPI2);
-    // Receive MSB
-    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
-	SPI_SendData8(SPI2, 0x00);
-	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
+//    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+    SPI_SendData8(SPI2, 0x00);
 	data_msb = SPI_ReceiveData8(SPI2);
 
-    GPIOB->ODR |= (1 << 6);        // CS high
+	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
+    GPIOB->ODR |= (0x0001 << 6);        // CS high
 
+    printf("msb = %X\t",data_msb);
+    printf("lsb = %X\t", data_lsb);
     data_out16 = (data_msb << 8) + data_lsb;
 
     return data_out16;
+}
+
+void lsm9ds1_write(uint8_t addr, uint8_t data_in) {
+    // Transmit
+    GPIOB->ODR &= ~(0x0001 << 6);
+    // Send address byte
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+    SPI_SendData8(SPI2, addr);
+    // Send data_in to lsm9ds1
+	SPI_SendData8(SPI2, data_in);
+	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+
+    GPIOB->ODR |= (0x0001 << 6);        // CS high
 }

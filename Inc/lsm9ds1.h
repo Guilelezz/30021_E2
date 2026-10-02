@@ -32,6 +32,7 @@
 #define INT1_DURATION 0x38
 
 void init_spi_lsm9ds1(void);
-uint8_t lsm9ds1_read(uint8_t reg);
+uint8_t lsm9ds1_read8(uint8_t reg);
+uint16_t lsm9ds1_read16(uint8_t reg);
 
 #endif /* LSM9DS1_H_ */

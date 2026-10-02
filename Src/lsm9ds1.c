@@ -78,7 +78,7 @@ void init_spi_lsm9ds1(void) {
     SPI2->CR1 |= 0x0040; // Enable SPI2
 }
 
-uint8_t lsm9ds1_read(uint8_t reg)
+uint8_t lsm9ds1_read8(uint8_t addr)
 {
     uint8_t data_out;
 
@@ -86,7 +86,7 @@ uint8_t lsm9ds1_read(uint8_t reg)
     GPIOB->ODR &= ~(1 << 6);       // CS low
     // Send register address + read bit
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
-    SPI_SendData8(SPI2, reg | 0x80);
+    SPI_SendData8(SPI2, addr | 0x80);
     // Wait for first byte to arrive
     while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
     SPI_ReceiveData8(SPI2); // Don't care about first received byte
@@ -99,6 +99,37 @@ uint8_t lsm9ds1_read(uint8_t reg)
     data_out = SPI_ReceiveData8(SPI2);
     // Disable chip select by putting it high.
     GPIOB->ODR |= (1 << 6);        // CS high
+
+    return data_out;
+}
+
+uint16_t lsm9ds1_read16(uint8_t addr)
+{
+    uint16_t data_out;
+    uint8_t data_lsb;
+    uint8_t data_msb;
+
+    // Transmit
+    GPIOB->ODR &= ~(1 << 6);
+
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+    SPI_SendData8(SPI2, addr | 0x80);
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
+    SPI_ReceiveData8(SPI2);
+    // Receive LSB
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+    SPI_SendData8(SPI2, 0x00);
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
+    data_lsb = SPI_ReceiveData8(SPI2);
+    // Receive MSB
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+	SPI_SendData8(SPI2, 0x00);
+	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
+	data_msb = SPI_ReceiveData8(SPI2);
+
+    GPIOB->ODR |= (1 << 6);        // CS high
+
+    data_out = data_msb << 8 + data_lsb
 
     return data_out;
 }

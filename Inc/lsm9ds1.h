@@ -32,8 +32,16 @@
 #define INT1_DURATION 0x38
 
 void init_spi_lsm9ds1(void);
-uint8_t lsm9ds1_read8(uint8_t addr);
-uint16_t lsm9ds1_read16(uint8_t addr);
-void lsm9ds1_write(uint8_t addr, uint8_t data_in);
+// These functions should be private!
+uint8_t M_read8(uint8_t addr);
+uint8_t AG_read8(uint8_t addr);
+void M_write(uint8_t addr, uint8_t data_in);
+void AG_write(uint8_t addr, uint8_t data_in);
+
+// Public functions
+uint16_t read_temp(void);
+
+void testing_shit(void);
+//uint16_t lsm9ds1_read16(uint8_t addr);
 
 #endif /* LSM9DS1_H_ */

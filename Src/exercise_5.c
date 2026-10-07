@@ -5,21 +5,12 @@
 
 
 
-
 void exercise_5(void) {
-	USART1_setup();
+	openlog_init(9600);
 
 	while (1) {
-
+		openlog_put_string("Hello there \n");
 	}
 
-	/*
-	 * read from openlog
-	 * config gpio pins to read/write
-	 * write to openlog
-	 * start byte
-	 * data
-	 * stop byte
-	 *
-	 */
+
 }

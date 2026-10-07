@@ -67,14 +67,6 @@ void init_spi_lsm9ds1(void) {
 	SPI2->CR1 |= 0x0040; // Enable SPI2
 }
 
-/* Function flow:
-	 * Chip select low (enable)
-	 * Send address register alongside r/w value
-	 * Send empty byte to enable clock
-	 * Wait for
-	 * Wait for receiving to finish
-	 * Chip select high (disable)
- */
 uint8_t M_read8(uint8_t addr) {
 	uint8_t data_out8;
 
@@ -83,11 +75,13 @@ uint8_t M_read8(uint8_t addr) {
 	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
 	SPI_SendData8(SPI2, addr | 0x80);
 
-//	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+	SPI_ReceiveData8(SPI2);
+
 	SPI_SendData8(SPI2, 0x00);
 
-	data_out8 = SPI_ReceiveData8(SPI2);
 	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
+	data_out8 = SPI_ReceiveData8(SPI2);
 
 	GPIOB->ODR |= (1 << 10);
 
@@ -97,9 +91,9 @@ uint8_t M_read8(uint8_t addr) {
 uint8_t AG_read8(uint8_t addr) {
 	uint8_t data_out8;
 
-    // Enable chip select via PB6 (Set low)
-    GPIOB->ODR &= ~(1 << 6);       // CS low
+    GPIOB->ODR &= ~(1 << 6);
 
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
 	SPI_SendData8(SPI2, addr | 0x80);
 
 	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
@@ -130,12 +124,6 @@ void M_write(uint8_t addr, uint8_t data_in) {
 	GPIOB->ODR |= (1 << 10);        // CS high
 }
 
-/** Please note that is MANDATORY: return 0 -> no Error.**/
-//int32_t platform_write(void *handle, uint8_t reg, const uint8_t *bufp, uint16_t len)
-//int32_t platform_read(void *handle, uint8_t reg, uint8_t *bufp, uint16_t len)
-
-
-
 void AG_write(uint8_t addr, uint8_t data_in) {
 	GPIOB->ODR &= ~(1 << 6);
 
@@ -153,75 +141,18 @@ void AG_write(uint8_t addr, uint8_t data_in) {
 
 
 uint16_t read_temp(void) {
-
-
-//	uint8_t int2_ctr = AG_read8(0x0D);
-//	printf("ctr reg = %X  ", int2_ctr);
-
 	uint8_t high_temp = AG_read8(0x16);
 	uint8_t low_temp = AG_read8(0x15);
 	uint8_t stat = AG_read8(0x17);
-	uint16_t temp = 0;
-//	printf("test-hi: %X  ",high_temp);
 
-//	high_temp = high_temp << 4;
-//	high_temp = high_temp >> 4;
+	int16_t temp_raw = ((int16_t)high_temp << 8) | low_temp;
+	float temp = 25.0f + (temp_raw / 16.0f);
 
-//	int16_t temp_raw = ((int16_t)high_temp << 8) | low_temp;
-//	float temp = 25.0f + (temp_raw / 16.0f);
-//	uint16_t temp = (high_temp << 8) + low_temp;
 	printf("hi: %X  ",high_temp);
 	printf("low: %X  ",low_temp);
-	printf("status: %X\n", stat);
-//	printf("total_temp = %.2f\n",temp);
-	return temp;
+//	printf("status: %X\n", stat);
+	printf("total_temp = %.2f\n",temp);
+
+	return temp_raw;
 }
 
-//int32_t platform_write(void *handle, uint8_t reg, const uint8_t *bufp, uint16_t len);
-//int32_t platform_read(void *handle, uint8_t reg, uint8_t *bufp, uint16_t len);
-//
-//
-//void testing_shit(void) {
-//	stmdev_ctx_t dev_ctx; /** xxxxxxx is the used part number **/
-//	dev_ctx.write_reg = platform_write;
-//	dev_ctx.read_reg = platform_read;
-//
-//	uint8_t val;
-//	int32_t status = lsm9ds1_temp_flag_data_ready_get(&dev_ctx , val);
-//	printf("status = %ld\n",status);
-//}
-//
-//void platform_write(uint8_t addr, uint8_t data_in) {
-//	GPIOB->ODR &= ~(1 << 6);
-//
-//	SPI_SendData8(SPI2, addr);
-//
-//	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
-//	SPI_ReceiveData8(SPI2);
-//
-//	SPI_SendData8(SPI2, data_in);
-//	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
-//	SPI_ReceiveData8(SPI2);
-//
-//	GPIOB->ODR |= (1 << 6);        // CS high
-//}
-//uint8_t platform_read(uint8_t addr) {
-//	uint8_t data_out8;
-//
-//	// Enable chip select via PB6 (Set low)
-//	GPIOB->ODR &= ~(1 << 6);       // CS low
-//
-//	SPI_SendData8(SPI2, addr | 0x80);
-//
-//	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
-//	SPI_ReceiveData8(SPI2);
-//
-//	SPI_SendData8(SPI2, 0x00);
-//
-//	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) != SET) {}
-//	data_out8 = SPI_ReceiveData8(SPI2);
-//
-//	GPIOB->ODR |= (1 << 6);
-//
-//	return data_out8;
-//}

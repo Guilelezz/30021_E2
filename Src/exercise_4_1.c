@@ -7,7 +7,6 @@ void exercise_4_1(void) {
 	uint16_t data_out16;
 
 	while (1) {
-//		testing_shit();
 		data_out16 = read_temp();
 //		printf("Received data = %X\n", data_out16);
 

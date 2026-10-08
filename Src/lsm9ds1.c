@@ -235,9 +235,21 @@ uint16_t read_temp(void) {
 void read_gyro(int16_t *x, int16_t *y, int16_t *z) {
 	while(!(get_AG_status() & 0x02)) {}
 
+	// (float_t)lsb * 70.0f for 2000dps to mdps
 	*x = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_X_L_G) * 70.0f);
 	*y = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Y_L_G) * 70.0f);
 	*z = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Z_L_G) * 70.0f);
 
+	printf("Gyroscope readings\tX = %4.2f\t Y = %4.2f\t Z = %4.2f\n");
 }
 
+void read_accel(int16_t *x, int16_t *y, int16_t *z) {
+	while(!(get_AG_status() & 0x01)) {}
+
+	// (float_t)lsb * 0.122f for fs4g to mg
+	*x = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_XL) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_X_L_XL) * 0.122f);
+	*y = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_XL) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Y_L_XL) * 0.122f);
+	*z = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_XL) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Z_L_XL) * 0.122f);
+
+	printf("Accelerometer readings\tX = %4.2f\t Y = %4.2f\t Z = %4.2f\n");
+}

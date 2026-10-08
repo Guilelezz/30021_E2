@@ -1,7 +1,16 @@
 #include "lsm9ds1.h"
-#include <stdbool.h>
-#include "stdint.h"
 #include "lsm9ds1_reg.h"
+
+static uint8_t get_AG_status(void);
+static uint8_t M_read8(uint8_t addr);
+static uint8_t AG_read8(uint8_t addr);
+static void M_write(uint8_t addr, uint8_t data_in);
+static void AG_write(uint8_t addr, uint8_t data_in);
+
+float_t lsm9ds1_from_fs2000dps_to_mdps(int16_t lsb)
+{
+  return ((float_t)lsb * 70.0f);
+}
 
 void init_spi_lsm9ds1(void) {
 	// Enable Clocks
@@ -110,18 +119,18 @@ uint8_t AG_read8(uint8_t addr) {
 }
 
 void M_write(uint8_t addr, uint8_t data_in) {
-	// Transmit
 	GPIOB->ODR &= ~(1 << 10);
-	// Send address byte
-	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {
-	}
-	SPI_SendData8(SPI2, addr);
-	// Send data_in to lsm9ds1
-	SPI_SendData8(SPI2, data_in);
-	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {
-	}
 
-	GPIOB->ODR |= (1 << 10);        // CS high
+	SPI_SendData8(SPI2, addr);
+
+	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+	SPI_ReceiveData8(SPI2);
+
+	SPI_SendData8(SPI2, data_in);
+	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
+	SPI_ReceiveData8(SPI2);
+
+	GPIOB->ODR |= (1 << 10);
 }
 
 void AG_write(uint8_t addr, uint8_t data_in) {
@@ -136,16 +145,83 @@ void AG_write(uint8_t addr, uint8_t data_in) {
 	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) != SET) {}
 	SPI_ReceiveData8(SPI2);
 
-	GPIOB->ODR |= (1 << 6);        // CS high
+	GPIOB->ODR |= (1 << 6);
 }
 
+void init_AG(void) {
+
+//	//------------
+//	// Register 1
+//	// Set Gyroscope scale = 2000 dps | 0x18
+//	AG_write(LSM9DS1_CTRL_REG1_G, LSM9DS1_2000dps);
+//	// Set Gyro filter bandwidth = Ultra light | 0x03
+//	AG_write(LSM9DS1_CTRL_REG1_G, LSM9DS1_LP_ULTRA_LIGHT);
+//	// Set Gyro output data rate = 59.5Hz | 0x40
+//	AG_write(LSM9DS1_CTRL_REG1_G, 0x40);
+//
+//	//------------
+//	// Register 2
+//	// Set out selection? | 0x02
+//	AG_write(LSM9DS1_CTRL_REG2_G, 0x02);
+//
+//	//------------
+//	// Register 3
+//	// Set Gyro High pass filter bandwith = Medium | 0x05
+//	AG_write(LSM9DS1_CTRL_REG3_G, LSM9DS1_HP_MEDIUM);
+//	// Enable Gyro high pass filter | 0x40
+//	AG_write(LSM9DS1_CTRL_REG3_G, 0x40);
+//	// Angular rate sensor disable low power mode | 0x00
+//	AG_write(LSM9DS1_CTRL_REG3_G, 0x00);
+//
+//	//------------
+//	// Register 6
+//	// Set Accelerometer scale = 4g | 0x10
+//	AG_write(LSM9DS1_CTRL_REG6_XL, LSM9DS1_4g);
+//	// Accelerometer filter bandwidth anti-alias = Auto | 0x00
+//	AG_write(LSM9DS1_CTRL_REG6_XL, LSM9DS1_AUTO);
+//	// Set Accelerometer output data rate = 50Hz | 0x40
+//	AG_write(LSM9DS1_CTRL_REG6_XL, 0x40);
+//
+//	//------------
+//	// Register 7
+//	// Set filter Low pass bandwith = ODR/50 | 0x80
+//	AG_write(LSM9DS1_CTRL_REG7_XL, LSM9DS1_LP_ODR_DIV_50);
+//	//Set filter out path = Low pass out | 0x00
+//	AG_write(LSM9DS_CTRL_REG7_XL, LSM9DS1_LP_OUT);
+	// Check ID
+	if (AG_read8(LSM9DS1_WHO_AM_I) != LSM9DS1_IMU_ID) return -1;
+
+	// Set Gyroscope, scale = 2000 dps, filter bandwith = ultra light, output data rate = 59.5Hz
+	AG_write(LSM9DS1_CTRL_REG1_G, 0x5A);
+
+	// Set gyroscope out selection
+	AG_write(LSM9DS1_CTRL_REG2_G, 0x02);
+
+	// Set Gyroscope Enable, HP filter = Medium, Disable low power mode.
+	AG_write(LSM9DS1_CTRL_REG3_G, 0x45);
+
+	// Set Accelerometer scale = 4g, bandwidth anti-alias = auto, output data rate = 50Hz
+	AG_write(LSM9DS1_CTRL_REG6_XL, 0x50);
+
+	//Set Accelerometer LP filter out, LP Bandwith = ODR/50
+	AG_write(LSM9DS1_CTRL_REG7_XL, 0x80);
+}
+
+uint8_t get_AG_status(void) {
+	return AG_read8(LSM9DS1_STATUS_REG);
+}
 
 uint16_t read_temp(void) {
 	uint8_t high_temp = AG_read8(0x16);
 	uint8_t low_temp = AG_read8(0x15);
-	uint8_t stat = AG_read8(0x17);
+	uint8_t status = get_AG_status();
+
+	if ((status & 0x04) != 0) {
+		printf("New temperature ready!\n");
+	}
 
 	int16_t temp_raw = ((int16_t)high_temp << 8) | low_temp;
+//	int16_t temp_raw = ((int16_t)AG_read8(0x16) << 8) | AG_read8(0x15);
 	float temp = 25.0f + (temp_raw / 16.0f);
 
 	printf("hi: %X  ",high_temp);
@@ -154,5 +230,14 @@ uint16_t read_temp(void) {
 	printf("total_temp = %.2f\n",temp);
 
 	return temp_raw;
+}
+
+void read_gyro(int16_t *x, int16_t *y, int16_t *z) {
+	while(!(get_AG_status() & 0x02)) {}
+
+	*x = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_X_L_G) * 70.0f);
+	*y = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Y_L_G) * 70.0f);
+	*z = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Z_L_G) * 70.0f);
+
 }
 

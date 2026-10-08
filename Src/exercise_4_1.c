@@ -2,7 +2,7 @@
 
 void exercise_4_1(void) {
 	init_spi_lsm9ds1();
-
+	init_AG();
 	uint8_t data_out8;
 	uint16_t data_out16;
 

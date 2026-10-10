@@ -216,6 +216,12 @@ int init_AG(void) {
 	//Set Accelerometer LP filter out, LP Bandwith = ODR/50
 	AG_write(LSM9DS1_CTRL_REG7_XL, 0x80);
 
+	// Read measurement from temperature, gyroscope and accelerometer, to discard initial value.
+	int16_t temp_buff[3];
+	read_temp();
+	read_gy(temp_buff);
+	read_xl(temp_buff);
+
 	return 0;
 }
 
@@ -251,4 +257,58 @@ void read_xl(int16_t *value) {
 	value[2] = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_XL) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Z_L_XL);
 
 //	printf("Accelerometer raw readings:\tX = %X\t Y = %X\t Z = %X\n",value[0],value[1],value[2]);
+}
+
+void calibrate_gy(int16_t *offset){
+	printf("Keep board steady while calibrating!\n");
+
+	offset[0] = 0; offset[1] = 0; offset[2] = 0;
+
+	int samples = 10;
+	int16_t raw_gyro_value[3];
+	int16_t value_calibration[3][samples];
+
+	// Read [samples] amount of values into array
+	for (int i = 0; i <= samples; i++) {
+		while(!(get_AG_status() & 0x02)) {}
+
+		read_gy(raw_gyro_value);
+		value_calibration[0][i] = raw_gyro_value[0];
+		value_calibration[1][i] = raw_gyro_value[1];
+		value_calibration[2][i] = raw_gyro_value[2];
+	}
+
+	// Find average of read values.
+	for (int i = 0; i <= samples; i++) {
+		offset[0] += value_calibration[0][i] / samples;
+		offset[1] += value_calibration[1][i] / samples;
+		offset[2] += value_calibration[2][i] / samples;
+	}
+}
+
+void calibrate_xl(int16_t *offset){
+	printf("Keep board steady while calibrating!\n");
+
+	offset[0] = 0; offset[1] = 0; offset[2] = 0;
+
+	int samples = 10;
+	int16_t raw_xl_value[3];
+	int16_t value_calibration[3][samples];
+
+	// Read [samples] amount of values into array
+	for (int i = 0; i <= samples; i++) {
+		while(!(get_AG_status() & 0x01)) {}
+
+		read_xl(raw_xl_value);
+		value_calibration[0][i] = raw_xl_value[0];
+		value_calibration[1][i] = raw_xl_value[1];
+		value_calibration[2][i] = raw_xl_value[2];
+	}
+
+	// Find average of read values.
+	for (int i = 0; i <= samples; i++) {
+		offset[0] += (float_t)value_calibration[0][i] / samples;
+		offset[1] += (float_t)value_calibration[1][i] / samples;
+		offset[2] += (float_t)value_calibration[2][i] / samples;
+	}
 }

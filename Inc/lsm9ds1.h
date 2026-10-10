@@ -98,6 +98,8 @@ int init_AG(void);
 int16_t read_temp(void);
 void read_gy(int16_t *value);
 void read_xl(int16_t *value);
+void calibrate_gy(int16_t *offset);
+void calibrate_xl(int16_t *offset);
 
 // Helper converter functions
 float_t temp_raw_to_float(int16_t temp_raw);

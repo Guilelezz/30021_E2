@@ -1,4 +1,7 @@
 #include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <math.h>
 #include "stm32f30x.h"
 
 #ifndef LSM9DS1_H_
@@ -91,9 +94,13 @@
 
 // Public functions
 void init_spi_lsm9ds1(void);
-void init_AG(void);
+int init_AG(void);
 uint16_t read_temp(void);
-void read_gyro(int16_t *x, int16_t *y, int16_t *z);
-void read_accel(int16_t *x, int16_t *y, int16_t *z);
+void read_gy(int16_t *value);
+void read_xl(int16_t *value);
+
+// Helper converter functions
+float_t fs2000dps_to_mdps(int16_t raw);
+float_t fs4g_to_mg(int16_t raw);
 
 #endif /* LSM9DS1_H_ */

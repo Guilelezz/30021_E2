@@ -1,15 +1,22 @@
 #include "lsm9ds1.h"
 #include "lsm9ds1_reg.h"
 
+// Initialize private functions.
 static uint8_t get_AG_status(void);
 static uint8_t M_read8(uint8_t addr);
 static uint8_t AG_read8(uint8_t addr);
 static void M_write(uint8_t addr, uint8_t data_in);
 static void AG_write(uint8_t addr, uint8_t data_in);
 
-float_t lsm9ds1_from_fs2000dps_to_mdps(int16_t lsb)
+
+float_t fs2000dps_to_mdps(int16_t raw)
 {
-  return ((float_t)lsb * 70.0f);
+  return ((float_t)raw * 70.0f);
+}
+
+float_t fs4g_to_mg(int16_t raw)
+{
+  return ((float_t)raw * 0.122f);
 }
 
 void init_spi_lsm9ds1(void) {
@@ -148,7 +155,7 @@ void AG_write(uint8_t addr, uint8_t data_in) {
 	GPIOB->ODR |= (1 << 6);
 }
 
-void init_AG(void) {
+int init_AG(void) {
 
 //	//------------
 //	// Register 1
@@ -205,6 +212,8 @@ void init_AG(void) {
 
 	//Set Accelerometer LP filter out, LP Bandwith = ODR/50
 	AG_write(LSM9DS1_CTRL_REG7_XL, 0x80);
+
+	return 0;
 }
 
 uint8_t get_AG_status(void) {
@@ -232,24 +241,23 @@ uint16_t read_temp(void) {
 	return temp_raw;
 }
 
-void read_gyro(int16_t *x, int16_t *y, int16_t *z) {
+
+void read_gy(int16_t *value) {
 	while(!(get_AG_status() & 0x02)) {}
 
-	// (float_t)lsb * 70.0f for 2000dps to mdps
-	*x = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_X_L_G) * 70.0f);
-	*y = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Y_L_G) * 70.0f);
-	*z = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Z_L_G) * 70.0f);
+	value[0] = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_G) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_X_L_G);
+	value[1] = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_G) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Y_L_G);
+	value[2] = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_G) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Z_L_G);
 
-	printf("Gyroscope readings\tX = %4.2f\t Y = %4.2f\t Z = %4.2f\n");
+	printf("Gyroscope raw readings:\tX = %X\t Y = %X\t Z = %X\n",value[0],value[1],value[2]);
 }
 
-void read_accel(int16_t *x, int16_t *y, int16_t *z) {
+void read_xl(int16_t *value) {
 	while(!(get_AG_status() & 0x01)) {}
 
-	// (float_t)lsb * 0.122f for fs4g to mg
-	*x = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_XL) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_X_L_XL) * 0.122f);
-	*y = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_XL) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Y_L_XL) * 0.122f);
-	*z = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_XL) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Z_L_XL) * 0.122f);
+	value[0] = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_XL) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_X_L_XL);
+	value[1] = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_XL) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Y_L_XL);
+	value[2] = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_XL) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Z_L_XL);
 
-	printf("Accelerometer readings\tX = %4.2f\t Y = %4.2f\t Z = %4.2f\n");
+	printf("Accelerometer raw readings:\tX = %X\t Y = %X\t Z = %X\n",value[0],value[1],value[2]);
 }

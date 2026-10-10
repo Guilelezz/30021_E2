@@ -5,9 +5,9 @@
 #include "lcd.h"
 #include "string.h"
 #include "flash.h"
-#include "joystick.h"
+#include "gpio.h"
 
-
+/*
 void uart_send_string(const char *str)
 {
     while (*str)
@@ -51,7 +51,7 @@ static Time_t GetTimeAtomic(volatile Time_t *src)
     return temp;
 }
 
-void initTimer2_100Hz(void)
+/*void initTimer2_100Hz(void)
 {
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
@@ -266,4 +266,4 @@ void custom_exercise_2_3(void)
     	        }
 
     }
-}
+}*/

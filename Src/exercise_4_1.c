@@ -1,0 +1,21 @@
+#include "lsm9ds1.h"
+
+void exercise_4_1(void) {
+	init_spi_lsm9ds1();
+	init_AG();
+	uint8_t data_out8;
+	uint16_t data_out16;
+
+	while (1) {
+		data_out16 = read_temp();
+//		printf("Received data = %X\n", data_out16);
+
+//		data_out8 = AG_read8(WHO_AM_I);
+//		printf("Received value = %X\n", data_out8);
+
+//		data_out16 = lsm9ds1_read16(WHO_AM_I);
+//		printf("Received data = %X\n", data_out16);
+
+//		lsm9ds1_write(WHO_AM_I, 0xAA);
+	}
+}

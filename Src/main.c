@@ -1,15 +1,19 @@
+#include "stm32f30x_conf.h"
+#include "30010_io.h"
+#include <stdio.h>
+#include <inttypes.h>
+
+#include "openlog.h"
 #include "exercises.h"
 #include "30010_io.h"
 
 int main(void) {
 	uart_init(9600);
 
-//	exercise_1_1();
-//	exercise_1_3();
-//	exercise_1_4();
-	exercise_1_5();
+	exercise_5();
 
 	while(1)
 	{
+
 	}
 }

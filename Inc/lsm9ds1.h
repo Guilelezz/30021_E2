@@ -95,12 +95,13 @@
 // Public functions
 void init_spi_lsm9ds1(void);
 int init_AG(void);
-uint16_t read_temp(void);
+int16_t read_temp(void);
 void read_gy(int16_t *value);
 void read_xl(int16_t *value);
 
 // Helper converter functions
-float_t fs2000dps_to_mdps(int16_t raw);
-float_t fs4g_to_mg(int16_t raw);
+float_t temp_raw_to_float(int16_t temp_raw);
+float_t fs2000dps_to_mdps(int16_t gy_raw);
+float_t fs4g_to_mg(int16_t xl_raw);
 
 #endif /* LSM9DS1_H_ */

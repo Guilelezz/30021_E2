@@ -8,15 +8,18 @@ static uint8_t AG_read8(uint8_t addr);
 static void M_write(uint8_t addr, uint8_t data_in);
 static void AG_write(uint8_t addr, uint8_t data_in);
 
-
-float_t fs2000dps_to_mdps(int16_t raw)
-{
-  return ((float_t)raw * 70.0f);
+float_t temp_raw_to_float(int16_t temp_raw) {
+	return 25.0f + (temp_raw / 16.0f);
 }
 
-float_t fs4g_to_mg(int16_t raw)
+float_t fs2000dps_to_mdps(int16_t gy_raw)
 {
-  return ((float_t)raw * 0.122f);
+  return ((float_t)gy_raw * 70.0f);
+}
+
+float_t fs4g_to_mg(int16_t xl_raw)
+{
+  return ((float_t)xl_raw * 0.122f);
 }
 
 void init_spi_lsm9ds1(void) {
@@ -220,44 +223,32 @@ uint8_t get_AG_status(void) {
 	return AG_read8(LSM9DS1_STATUS_REG);
 }
 
-uint16_t read_temp(void) {
-	uint8_t high_temp = AG_read8(0x16);
-	uint8_t low_temp = AG_read8(0x15);
-	uint8_t status = get_AG_status();
+int16_t read_temp(void) {
+	// Wait for new temperature value to be ready.
+	while(!(get_AG_status() & 0x04)) {}
 
-	if ((status & 0x04) != 0) {
-		printf("New temperature ready!\n");
-	}
-
-	int16_t temp_raw = ((int16_t)high_temp << 8) | low_temp;
-//	int16_t temp_raw = ((int16_t)AG_read8(0x16) << 8) | AG_read8(0x15);
-	float temp = 25.0f + (temp_raw / 16.0f);
-
-	printf("hi: %X  ",high_temp);
-	printf("low: %X  ",low_temp);
-//	printf("status: %X\n", stat);
-	printf("total_temp = %.2f\n",temp);
-
-	return temp_raw;
+	return ((int16_t)AG_read8(LSM9DS1_OUT_TEMP_H) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_TEMP_L);
 }
 
 
 void read_gy(int16_t *value) {
+	// Wait for new gyroscope value to be ready.
 	while(!(get_AG_status() & 0x02)) {}
 
 	value[0] = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_G) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_X_L_G);
 	value[1] = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_G) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Y_L_G);
 	value[2] = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_G) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Z_L_G);
 
-	printf("Gyroscope raw readings:\tX = %X\t Y = %X\t Z = %X\n",value[0],value[1],value[2]);
+//	printf("Gyroscope raw readings:\tX = %X\t Y = %X\t Z = %X\n",value[0],value[1],value[2]);
 }
 
 void read_xl(int16_t *value) {
+	// Wait for new acceleromter value to be ready.
 	while(!(get_AG_status() & 0x01)) {}
 
 	value[0] = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_XL) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_X_L_XL);
 	value[1] = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_XL) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Y_L_XL);
 	value[2] = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_XL) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Z_L_XL);
 
-	printf("Accelerometer raw readings:\tX = %X\t Y = %X\t Z = %X\n",value[0],value[1],value[2]);
+//	printf("Accelerometer raw readings:\tX = %X\t Y = %X\t Z = %X\n",value[0],value[1],value[2]);
 }

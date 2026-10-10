@@ -260,7 +260,7 @@ void read_xl(int16_t *value) {
 }
 
 void calibrate_gy(int16_t *offset){
-	printf("Keep board steady while calibrating!\n");
+	printf("Calibrating Gyroscope.\n Keep board steady!\n");
 
 	offset[0] = 0; offset[1] = 0; offset[2] = 0;
 
@@ -276,6 +276,8 @@ void calibrate_gy(int16_t *offset){
 		value_calibration[0][i] = raw_gyro_value[0];
 		value_calibration[1][i] = raw_gyro_value[1];
 		value_calibration[2][i] = raw_gyro_value[2];
+
+		printf(".");
 	}
 
 	// Find average of read values.
@@ -284,10 +286,11 @@ void calibrate_gy(int16_t *offset){
 		offset[1] += value_calibration[1][i] / samples;
 		offset[2] += value_calibration[2][i] / samples;
 	}
+	printf("\nDone calibrating Gyroscope.\n");
 }
 
 void calibrate_xl(int16_t *offset){
-	printf("Keep board steady while calibrating!\n");
+	printf("Calibrating Acceleromter.\n Keep board steady!\n");
 
 	offset[0] = 0; offset[1] = 0; offset[2] = 0;
 
@@ -303,6 +306,8 @@ void calibrate_xl(int16_t *offset){
 		value_calibration[0][i] = raw_xl_value[0];
 		value_calibration[1][i] = raw_xl_value[1];
 		value_calibration[2][i] = raw_xl_value[2];
+
+		printf(".");
 	}
 
 	// Find average of read values.
@@ -311,4 +316,5 @@ void calibrate_xl(int16_t *offset){
 		offset[1] += (float_t)value_calibration[1][i] / samples;
 		offset[2] += (float_t)value_calibration[2][i] / samples;
 	}
+	printf("\nDone calibrating Accelerometer.\n");
 }

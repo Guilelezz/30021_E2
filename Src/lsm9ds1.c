@@ -1,15 +1,25 @@
 #include "lsm9ds1.h"
 #include "lsm9ds1_reg.h"
 
+// Initialize private functions.
 static uint8_t get_AG_status(void);
 static uint8_t M_read8(uint8_t addr);
 static uint8_t AG_read8(uint8_t addr);
 static void M_write(uint8_t addr, uint8_t data_in);
 static void AG_write(uint8_t addr, uint8_t data_in);
 
-float_t lsm9ds1_from_fs2000dps_to_mdps(int16_t lsb)
+float_t temp_raw_to_float(int16_t temp_raw) {
+	return 25.0f + (temp_raw / 16.0f);
+}
+
+float_t fs2000dps_to_mdps(int16_t gy_raw)
 {
-  return ((float_t)lsb * 70.0f);
+  return ((float_t)gy_raw * 70.0f);
+}
+
+float_t fs4g_to_mg(int16_t xl_raw)
+{
+  return ((float_t)xl_raw * 0.122f);
 }
 
 void init_spi_lsm9ds1(void) {
@@ -148,7 +158,7 @@ void AG_write(uint8_t addr, uint8_t data_in) {
 	GPIOB->ODR |= (1 << 6);
 }
 
-void init_AG(void) {
+int init_AG(void) {
 
 //	//------------
 //	// Register 1
@@ -205,51 +215,106 @@ void init_AG(void) {
 
 	//Set Accelerometer LP filter out, LP Bandwith = ODR/50
 	AG_write(LSM9DS1_CTRL_REG7_XL, 0x80);
+
+	// Read measurement from temperature, gyroscope and accelerometer, to discard initial value.
+	int16_t temp_buff[3];
+	read_temp();
+	read_gy(temp_buff);
+	read_xl(temp_buff);
+
+	return 0;
 }
 
 uint8_t get_AG_status(void) {
 	return AG_read8(LSM9DS1_STATUS_REG);
 }
 
-uint16_t read_temp(void) {
-	uint8_t high_temp = AG_read8(0x16);
-	uint8_t low_temp = AG_read8(0x15);
-	uint8_t status = get_AG_status();
+int16_t read_temp(void) {
+	// Wait for new temperature value to be ready.
+	while(!(get_AG_status() & 0x04)) {}
 
-	if ((status & 0x04) != 0) {
-		printf("New temperature ready!\n");
-	}
-
-	int16_t temp_raw = ((int16_t)high_temp << 8) | low_temp;
-//	int16_t temp_raw = ((int16_t)AG_read8(0x16) << 8) | AG_read8(0x15);
-	float temp = 25.0f + (temp_raw / 16.0f);
-
-	printf("hi: %X  ",high_temp);
-	printf("low: %X  ",low_temp);
-//	printf("status: %X\n", stat);
-	printf("total_temp = %.2f\n",temp);
-
-	return temp_raw;
+	return ((int16_t)AG_read8(LSM9DS1_OUT_TEMP_H) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_TEMP_L);
 }
 
-void read_gyro(int16_t *x, int16_t *y, int16_t *z) {
+
+void read_gy(int16_t *value) {
+	// Wait for new gyroscope value to be ready.
 	while(!(get_AG_status() & 0x02)) {}
 
-	// (float_t)lsb * 70.0f for 2000dps to mdps
-	*x = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_X_L_G) * 70.0f);
-	*y = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Y_L_G) * 70.0f);
-	*z = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_G) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Z_L_G) * 70.0f);
+	value[0] = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_G) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_X_L_G);
+	value[1] = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_G) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Y_L_G);
+	value[2] = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_G) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Z_L_G);
 
-	printf("Gyroscope readings\tX = %4.2f\t Y = %4.2f\t Z = %4.2f\n");
+//	printf("Gyroscope raw readings:\tX = %X\t Y = %X\t Z = %X\n",value[0],value[1],value[2]);
 }
 
-void read_accel(int16_t *x, int16_t *y, int16_t *z) {
+void read_xl(int16_t *value) {
+	// Wait for new acceleromter value to be ready.
 	while(!(get_AG_status() & 0x01)) {}
 
-	// (float_t)lsb * 0.122f for fs4g to mg
-	*x = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_XL) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_X_L_XL) * 0.122f);
-	*y = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_XL) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Y_L_XL) * 0.122f);
-	*z = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_XL) << 8) | ((float_t)AG_read8(LSM9DS1_OUT_Z_L_XL) * 0.122f);
+	value[0] = ((int16_t)AG_read8(LSM9DS1_OUT_X_H_XL) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_X_L_XL);
+	value[1] = ((int16_t)AG_read8(LSM9DS1_OUT_Y_H_XL) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Y_L_XL);
+	value[2] = ((int16_t)AG_read8(LSM9DS1_OUT_Z_H_XL) << 8) | (int16_t)AG_read8(LSM9DS1_OUT_Z_L_XL);
 
-	printf("Accelerometer readings\tX = %4.2f\t Y = %4.2f\t Z = %4.2f\n");
+//	printf("Accelerometer raw readings:\tX = %X\t Y = %X\t Z = %X\n",value[0],value[1],value[2]);
+}
+
+void calibrate_gy(int16_t *offset){
+	printf("Calibrating Gyroscope.\n Keep board steady!\n");
+
+	offset[0] = 0; offset[1] = 0; offset[2] = 0;
+
+	int samples = 10;
+	int16_t raw_gyro_value[3];
+	int16_t value_calibration[3][samples];
+
+	// Read [samples] amount of values into array
+	for (int i = 0; i <= samples; i++) {
+		while(!(get_AG_status() & 0x02)) {}
+
+		read_gy(raw_gyro_value);
+		value_calibration[0][i] = raw_gyro_value[0];
+		value_calibration[1][i] = raw_gyro_value[1];
+		value_calibration[2][i] = raw_gyro_value[2];
+
+		printf(".");
+	}
+
+	// Find average of read values.
+	for (int i = 0; i <= samples; i++) {
+		offset[0] += value_calibration[0][i] / samples;
+		offset[1] += value_calibration[1][i] / samples;
+		offset[2] += value_calibration[2][i] / samples;
+	}
+	printf("\nDone calibrating Gyroscope.\n");
+}
+
+void calibrate_xl(int16_t *offset){
+	printf("Calibrating Acceleromter.\n Keep board steady!\n");
+
+	offset[0] = 0; offset[1] = 0; offset[2] = 0;
+
+	int samples = 10;
+	int16_t raw_xl_value[3];
+	int16_t value_calibration[3][samples];
+
+	// Read [samples] amount of values into array
+	for (int i = 0; i <= samples; i++) {
+		while(!(get_AG_status() & 0x01)) {}
+
+		read_xl(raw_xl_value);
+		value_calibration[0][i] = raw_xl_value[0];
+		value_calibration[1][i] = raw_xl_value[1];
+		value_calibration[2][i] = raw_xl_value[2];
+
+		printf(".");
+	}
+
+	// Find average of read values.
+	for (int i = 0; i <= samples; i++) {
+		offset[0] += (float_t)value_calibration[0][i] / samples;
+		offset[1] += (float_t)value_calibration[1][i] / samples;
+		offset[2] += (float_t)value_calibration[2][i] / samples;
+	}
+	printf("\nDone calibrating Accelerometer.\n");
 }

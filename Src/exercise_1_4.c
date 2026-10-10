@@ -1,4 +1,4 @@
-#include "gpio.h"
+/*#include "gpio.h"
 
 void uart_send_string(const char *str)
 {
@@ -183,4 +183,4 @@ void exercise_1_4(void)
         }
     }
 }
-
+*/
